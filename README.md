@@ -20,8 +20,6 @@ This MATLAB project visualizes ECG signals in a clear and interactive way. It al
 - **MATLAB** (Signal visualization and processing)
 - Signal Processing Toolbox (if filtering is applied)
 
-## Screenshots
-
 
 ## Why This Project?
 This project demonstrates:

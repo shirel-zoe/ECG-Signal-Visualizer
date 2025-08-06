@@ -1,0 +1,75 @@
+function ecg_signal_visualizer
+    % GUI Window
+    f = figure("Name","ECG Signal Visualizer","Position",[150, 100, 1200, 800]);
+
+    % Axes for Original and Filtered ECG
+    ax1 = axes("Parent",f,"Units","pixels","Position",[80, 450, 400, 250]);
+    title(ax1,"Original ECG Signal"); xlabel(ax1,"Time(sec)"); ylabel(ax1,"Amplitude");
+
+    ax2 = axes("Parent",f,"Units","pixels","Position",[600, 450, 400, 250]);
+    title(ax2,"Filtered ECG Signal"); xlabel(ax2,"Time(sec)"); ylabel(ax2,"Amplitude");
+
+    % Buttons
+    uicontrol("Style","pushbutton","String","Load ECG","Position",[300, 370, 150, 40],"Callback",@Load_ECG);
+    uicontrol("Style","pushbutton","String","Apply Filter","Position",[500, 370, 150, 40],"Callback",@Apply_filter);
+    uicontrol("Style","pushbutton","String","Detect Heart Rate","Position",[700, 370, 150, 40],"Callback",@Detect_Heart_rate);
+
+    % Variables
+    ecgSignal = [];
+    Fs = 0;
+    FilteredECG = [];
+
+    %% Load ECG
+    function Load_ECG(~,~)
+        [file,path] = uigetfile('*.mat','Please select an ECG File');
+        if isequal(file,0)
+            msgbox('No file selected'); return;
+        end
+        data = load(fullfile(path,file));
+        if isfield(data,'ecg') && isfield(data,'Fs')
+            ecgSignal = data.ecg;
+            Fs = data.Fs;
+        else
+            msgbox('Invalid file: must contain ecg and Fs'); return;
+        end
+        t = (0:length(ecgSignal)-1)/Fs;
+        plot(ax1,t,ecgSignal); title(ax1,'Original ECG Signal');
+    end
+
+    %% Apply Filter
+    function Apply_filter(~,~)
+        if isempty(ecgSignal)
+            msgbox('Please select an ECG file first!'); return;
+        end
+        % High-pass filter
+        hpfilt = designfilt('highpassiir','FilterOrder',8,'HalfPowerFrequency',0.5,'SampleRate',Fs);
+        temp = filtfilt(hpfilt,ecgSignal);
+
+        % Low-pass filter
+        lpfilt = designfilt('lowpassiir','FilterOrder',8,'HalfPowerFrequency',100,'SampleRate',Fs);
+        temp = filtfilt(lpfilt,temp);
+
+        % Notch filter
+        notchfilt = designfilt('bandstopiir','FilterOrder',4,'HalfPowerFrequency1',49,'HalfPowerFrequency2',51,'SampleRate',Fs);
+        FilteredECG = filtfilt(notchfilt,temp);
+
+        t = (0:length(FilteredECG)-1)/Fs;
+        plot(ax2,t,FilteredECG); title(ax2,'Filtered ECG Signal');
+    end
+
+    %% Detect Heart Rate
+    function Detect_Heart_rate(~,~)
+        if isempty(FilteredECG)
+            msgbox('Please apply filters before detecting heart rate'); return;
+        end
+        [~,locs] = findpeaks(FilteredECG,'MinPeakHeight',0.5,'MinPeakDistance',Fs*0.6);
+        RR_interval = diff(locs)/Fs;
+        HR_calculation = 60/mean(RR_interval);
+        msgbox(['Estimated Heart Rate: ',num2str(round(HR_calculation)),' bpm']);
+
+        hold(ax2,'on');
+        t = (0:length(FilteredECG)-1)/Fs;
+        plot(ax2,t(locs),FilteredECG(locs),'ro','MarkerFaceColor','r');
+        hold(ax2,'off');
+    end
+end
